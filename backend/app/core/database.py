@@ -1,7 +1,7 @@
 from sqlmodel import SQLModel, create_engine, Session
 from app.core.config import settings
 
-from app.models import Object, Diagnostic
+from app.models import Object, Diagnostic, Pipeline, Inspection, Defect
 
 # Create engine
 engine = create_engine(
@@ -14,8 +14,11 @@ engine = create_engine(
 
 
 def init_db():
-    """Initialize database - create all tables"""
-    SQLModel.metadata.create_all(engine)
+    """Initialize database - create all tables"""    
+    try:
+        SQLModel.metadata.create_all(engine)
+    except Exception as e:
+        print(e)
 
 
 def get_session():
