@@ -1,0 +1,9 @@
+from typing import Generator
+from sqlmodel import Session
+from app.core.database import get_session
+
+
+def get_db() -> Generator[Session, None, None]:
+    """Dependency to get database session"""
+    yield from get_session()
+

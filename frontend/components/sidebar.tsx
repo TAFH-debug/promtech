@@ -156,6 +156,16 @@ export function Sidebar({ isOpen = true, onToggle }: SidebarProps) {
               })}
             </div>
           </div>
+          <div className="flex justify-center p-4 border-t border-divider">
+            <Link
+              className="flex items-center gap-1 text-current"
+              href="https://terricon.kz"
+              title="terricon homepage"
+            >
+              <span className="text-default-600">Made for</span>
+              <p className="text-primary">Terricon Valley</p>
+            </Link>
+          </div>
         </CardBody>
       </Card>
     </>

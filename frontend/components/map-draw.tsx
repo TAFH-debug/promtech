@@ -75,7 +75,6 @@ function DrawControl({ onDraw, initialPoints = [], initialLines = [] }: DrawCont
         },
         polyline: {
           allowIntersection: false,
-          showArea: false,
           shapeOptions: {
             color: "#3b82f6",
             weight: 4,

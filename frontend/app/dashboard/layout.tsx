@@ -1,3 +1,4 @@
+import { Link } from "@heroui/link";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -10,6 +11,8 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <>{children}</>;
+  return <>
+    {children}
+  </>;
 }
 
