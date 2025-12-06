@@ -9,7 +9,7 @@ export default function Home() {
   const router = useRouter();
   
   const onChange = async (e: ChangeEvent) => {
-    await axios.postForm("/csv/uploadfile", {
+    await axios.postForm("/csv/import/", {
       file: e.target.files[0],
     });
 
