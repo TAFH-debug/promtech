@@ -138,3 +138,27 @@ export async function fetchDashboardStats(): Promise<DashboardStats> {
   return response.json();
 }
 
+// File Import History Types
+export interface FileImportHistory {
+  import_id: number;
+  filename: string;
+  file_type: string;
+  file_size?: number;
+  created: number;
+  updated: number;
+  defects_created: number;
+  error_count: number;
+  imported_at: string;
+}
+
+export async function fetchImportHistory(): Promise<FileImportHistory[]> {
+  const url = `${API_BASE_URL}/csv/imports/`;
+  const response = await fetch(url);
+  
+  if (!response.ok) {
+    throw new Error(`Failed to fetch import history: ${response.statusText}`);
+  }
+  
+  return response.json();
+}
+

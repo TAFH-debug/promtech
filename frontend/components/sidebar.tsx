@@ -13,6 +13,7 @@ import {
   Package,
   Menu,
   X,
+  Bot,
 } from "lucide-react";
 
 interface SidebarItem {
@@ -27,6 +28,16 @@ const menuItems: SidebarItem[] = [
     icon: Home,
     href: "/dashboard",
   },
+  {
+    title: "Import",
+    icon: Package,
+    href: "/dashboard/import",
+  },
+  {
+    title: "AI Bot",
+    icon: Bot,
+    href: "/dashboard/ai-bot",
+  }
 ];
 
 const bottomMenuItems: SidebarItem[] = [
