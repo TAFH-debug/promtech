@@ -32,7 +32,7 @@ async def import_file(file: UploadFile, db: Session = Depends(get_db)):
     defects_created = 0
 
     if file_type == "objects":
-        created, updated = import_objects(df, db, errors)
+        created = import_objects(df, db, errors)
     elif file_type == "diagnostics":
         required_diag = {"object_id", "method", "date", "defect_found"}
         cols_lower = {c.lower() for c in columns}

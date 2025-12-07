@@ -95,3 +95,46 @@ export async function searchObjects(params: ObjectSearchParams = {}): Promise<Ob
   return response.json();
 }
 
+// Dashboard Statistics Types
+export interface DefectByMethod {
+  method: string;
+  count: number;
+}
+
+export interface DefectByCriticality {
+  criticality: string;
+  count: number;
+}
+
+export interface TopRisk {
+  object_id: number;
+  object_name: string;
+  pipeline_id?: string;
+  criticality?: string;
+  defect_count: number;
+  max_depth?: number;
+}
+
+export interface InspectionsByYear {
+  year: number;
+  count: number;
+}
+
+export interface DashboardStats {
+  defects_by_method: DefectByMethod[];
+  defects_by_criticality: DefectByCriticality[];
+  top_risks: TopRisk[];
+  inspections_by_year: InspectionsByYear[];
+}
+
+export async function fetchDashboardStats(): Promise<DashboardStats> {
+  const url = `${API_BASE_URL}/dashboard/stats`;
+  const response = await fetch(url);
+  
+  if (!response.ok) {
+    throw new Error(`Failed to fetch dashboard stats: ${response.statusText}`);
+  }
+  
+  return response.json();
+}
+

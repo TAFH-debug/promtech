@@ -12,59 +12,28 @@ from app.services.import_helpers import normalize_object_type
 
 def import_objects(df: pd.DataFrame, db: Session, errors: list) -> tuple[int, int]:
     created_objects: List[Object] = []
-    updated_objects: List[Object] = []
 
-    for idx, row in df.iterrows():
-        try:
-            obj_type = normalize_object_type(row.get("object_type", ""))
-            pipeline_value = (
-                (str(row.get("pipeline_id")) if pd.notna(row.get("pipeline_id")) else "").strip() or None
-            )
-            data = {
-                "object_name": str(row.get("object_name") or "").strip(),
-                "object_type": obj_type,
-                "pipeline_id": pipeline_value,
-                "lat": float(row.get("lat")),
-                "lon": float(row.get("lon")),
-                "year": int(row.get("year")) if pd.notna(row.get("year")) else None,
-                "material": (str(row.get("material")) if pd.notna(row.get("material")) else "").strip() or None,
-            }
+    try:
+        df['object_type'] = df['object_type'].apply(normalize_object_type)
+        df['object_type'] = df['object_type'].fillna('pipeline section')
+        df['material'] = df['material'].fillna('Unknown')
 
-            if not data["object_name"]:
-                raise ValueError("object_name is required")
+        pipelines = df['pipeline_id'].dropna().unique().tolist()
+        for pipeline_id in pipelines:
+            existing_pipeline = db.get(Pipeline, pipeline_id)
+            if not existing_pipeline:
+                db.add(Pipeline(pipeline_id=pipeline_id, description=None))
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Error processing pipelines: {exc}")
+    
+    for i in df[["object_name", "object_type", "pipeline_id", "lat", "lon", "year", "material", "object_id"]].to_dict(orient="records"):
+        created_objects.append(Object(**i))
 
-            if pipeline_value:
-                existing_pipeline = db.get(Pipeline, pipeline_value)
-                if not existing_pipeline:
-                    db.add(Pipeline(pipeline_id=pipeline_value, description=None))
-
-            obj_id = int(row.get("object_id")) if pd.notna(row.get("object_id")) else None
-
-            if obj_id:
-                existing = db.get(Object, obj_id)
-                if existing:
-                    for k, v in data.items():
-                        setattr(existing, k, v)
-                    existing.updated_at = datetime.utcnow()
-                    updated_objects.append(existing)
-                    continue
-                data["object_id"] = obj_id
-
-            new_obj = Object(**data)
-            created_objects.append(new_obj)
-        except Exception as exc:
-            errors.append({"row": idx + 2, "error": str(exc)})
-
-    for obj in created_objects:
-        db.add(obj)
-
+    db.add_all(created_objects)
     try:
         db.commit()
     except Exception as exc:
         db.rollback()
         raise HTTPException(status_code=400, detail=f"Failed to save data: {exc}")
 
-    for obj in created_objects + updated_objects:
-        db.refresh(obj)
-
-    return len(created_objects), len(updated_objects)
+    return len(created_objects)
