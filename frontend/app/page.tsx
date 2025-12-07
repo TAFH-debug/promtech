@@ -4,7 +4,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ArrowBigRight } from "lucide-react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Card, CardBody } from "@heroui/card";
 
 export default function Home() {
   const [isExiting, setIsExiting] = useState(false);

@@ -13,3 +13,5 @@ lightgbm
 scikit-learn
 google-generativeai
 reportlab
+folium
+Pillow

@@ -1,6 +1,8 @@
 import io
+import os
+import tempfile
 from datetime import datetime
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
@@ -20,9 +22,12 @@ from reportlab.platypus import (
     PageBreak,
     Frame,
     PageTemplate,
-    NextPageTemplate
+    NextPageTemplate,
+    Image
 )
 from reportlab.graphics.shapes import Drawing, Rect, String
+from PIL import Image as PILImage, ImageDraw, ImageFont
+import folium
 from app.api.deps import get_db
 from app.models.object import Object
 from app.models.inspection import Inspection
@@ -214,30 +219,158 @@ def build_defects_table(defects: List[Dict], styles) -> List:
     story.append(t)
     return story
 
-def build_site_map_placeholder(styles) -> List:
+def generate_map_image(objects: List[Object], defects: List[Dict], pipeline_id: str) -> Optional[io.BytesIO]:
+    """Генерирует статическую карту с объектами и дефектами используя folium и imgkit"""
+    try:
+        if not objects:
+            return None
+        
+        # Получаем координаты всех объектов
+        coords = [(float(obj.lat), float(obj.lon)) for obj in objects if obj.lat and obj.lon]
+        if not coords:
+            return None
+        
+        # Вычисляем центр карты
+        avg_lat = sum(c[0] for c in coords) / len(coords)
+        avg_lon = sum(c[1] for c in coords) / len(coords)
+        
+        # Создаем карту folium
+        m = folium.Map(
+            location=[avg_lat, avg_lon],
+            zoom_start=10,
+            tiles='OpenStreetMap'
+        )
+        
+        # Добавляем маркеры для объектов
+        for obj in objects:
+            if obj.lat and obj.lon:
+                folium.Marker(
+                    [float(obj.lat), float(obj.lon)],
+                    popup=f"Object: {obj.object_id}",
+                    icon=folium.Icon(color='blue', icon='info-sign')
+                ).add_to(m)
+        
+        # Добавляем маркеры для дефектов с цветами по критичности
+        for defect in defects:
+            lat, lon = defect['coords']
+            if lat and lon and lat != 0.0 and lon != 0.0:
+                severity = defect['severity']
+                if severity >= 4:
+                    color = 'red'
+                    icon = 'exclamation-sign'
+                elif severity == 3:
+                    color = 'orange'
+                    icon = 'warning-sign'
+                else:
+                    color = 'yellow'
+                    icon = 'info-sign'
+                
+                folium.Marker(
+                    [lat, lon],
+                    popup=f"Defect: {defect['id']} (Severity: {severity})",
+                    icon=folium.Icon(color=color, icon=icon)
+                ).add_to(m)
+        
+        # Добавляем линию между объектами одного pipeline
+        if len(coords) > 1:
+            folium.PolyLine(
+                coords,
+                color='blue',
+                weight=3,
+                opacity=0.7
+            ).add_to(m)
+        
+        # Сохраняем карту во временный HTML файл
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False, encoding='utf-8') as tmp_file:
+            m.save(tmp_file.name)
+            html_path = tmp_file.name
+        
+        try:
+            # Пробуем использовать imgkit для конвертации HTML в изображение
+            try:
+                import imgkit
+                # Настройки для imgkit
+                options = {
+                    'format': 'png',
+                    'width': 1200,
+                    'height': 800,
+                    'disable-smart-shrinking': ''
+                }
+                
+                # Конвертируем HTML в PNG
+                screenshot_path = html_path.replace('.html', '.png')
+                imgkit.from_file(html_path, screenshot_path, options=options)
+                
+                # Открываем изображение
+                img = PILImage.open(screenshot_path)
+                
+                # Изменяем размер для PDF (ширина A4 минус отступы)
+                max_width = int(A4[0] - 40*mm)
+                max_height = int(200*mm)
+                img.thumbnail((max_width, max_height), PILImage.Resampling.LANCZOS)
+                
+                # Сохраняем в BytesIO
+                img_buffer = io.BytesIO()
+                img.save(img_buffer, format='PNG')
+                img_buffer.seek(0)
+                
+                # Удаляем временные файлы
+                os.unlink(html_path)
+                os.unlink(screenshot_path)
+                
+                return img_buffer
+            except (ImportError, Exception) as e:
+                # Если imgkit не установлен или не работает, возвращаем None (будет использован placeholder)
+                if os.path.exists(html_path):
+                    os.unlink(html_path)
+                print(f"imgkit not available or error: {e}")
+                return None
+        except Exception as e:
+            # Если конвертация не работает, удаляем HTML файл и возвращаем None
+            if os.path.exists(html_path):
+                os.unlink(html_path)
+            print(f"Error generating map screenshot: {e}")
+            return None
+    except Exception as e:
+        print(f"Error generating map: {e}")
+        return None
+
+def build_site_map(objects: List[Object], defects: List[Dict], pipeline_id: str, styles) -> List:
+    """Создает секцию карты с реальной картой или placeholder"""
     story = []
     story.append(Paragraph("Visual Inspection Map", styles["SectionHeader"]))
     
-    drawing = Drawing(400, 150)
-    rect = Rect(0, 0, 450, 150)
-    rect.strokeColor = colors.gray
-    rect.strokeDashArray = [4, 2]
-    rect.fillColor = colors.HexColor("#f9f9f9")
-    drawing.add(rect)
+    map_image = generate_map_image(objects, defects, pipeline_id)
     
-    text = String(225, 75, "MAP VISUALIZATION AREA", textAnchor="middle")
-    text.fontName = "Helvetica-Bold"
-    text.fillColor = colors.gray
-    drawing.add(text)
+    if map_image:
+        # Вставляем изображение карты
+        img = Image(map_image, width=A4[0] - 40*mm, height=200*mm)
+        story.append(img)
+        story.append(Spacer(1, 5))
+        story.append(Paragraph("Map showing pipeline objects and detected defects.", styles["NormalText"]))
+    else:
+        # Fallback на placeholder
+        drawing = Drawing(400, 150)
+        rect = Rect(0, 0, 450, 150)
+        rect.strokeColor = colors.gray
+        rect.strokeDashArray = [4, 2]
+        rect.fillColor = colors.HexColor("#f9f9f9")
+        drawing.add(rect)
+        
+        text = String(225, 75, "MAP VISUALIZATION AREA", textAnchor="middle")
+        text.fontName = "Helvetica-Bold"
+        text.fillColor = colors.gray
+        drawing.add(text)
+        
+        story.append(drawing)
+        story.append(Spacer(1, 10))
+        story.append(Paragraph("Note: Map data is generated based on sensor telemetry.", styles["NormalText"]))
     
-    story.append(drawing)
-    story.append(Spacer(1, 10))
-    story.append(Paragraph("Note: Map data is generated based on sensor telemetry.", styles["NormalText"]))
     story.append(Spacer(1, 10*mm))
     return story
 
 
-def _collect_defects_from_db(pipeline_id: str, db: Session) -> Tuple[List[Dict], int]:
+def _collect_defects_from_db(pipeline_id: str, db: Session) -> Tuple[List[Dict], List[Object], int]:
     needle = pipeline_id.strip()
     objects = db.exec(select(Object).where(func.lower(Object.pipeline_id) == needle.lower())).all()
     if not objects:
@@ -281,11 +414,11 @@ def _collect_defects_from_db(pipeline_id: str, db: Session) -> Tuple[List[Dict],
             "severity": severity,
             "coords": (float(obj.lat) if obj else 0.0, float(obj.lon) if obj else 0.0),
         })
-    return collected, len(objects)
+    return collected, list(objects), len(objects)
 
 @router.get("/{pipeline_id}/pdf", response_class=StreamingResponse)
 def pipeline_report_pdf(pipeline_id: str, db: Session = Depends(get_db)):
-    defects, obj_count = _collect_defects_from_db(pipeline_id, db)
+    defects, objects, obj_count = _collect_defects_from_db(pipeline_id, db)
     meta = {"pipeline_id": pipeline_id, "object_count": obj_count}
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, 
@@ -305,7 +438,7 @@ def pipeline_report_pdf(pipeline_id: str, db: Session = Depends(get_db)):
     story += build_cover(meta, styles)
     
     story += build_general_stats(defects, styles)
-    story += build_site_map_placeholder(styles)
+    story += build_site_map(objects, defects, pipeline_id, styles)
     story += build_defects_table(defects, styles)
 
     doc.build(story)

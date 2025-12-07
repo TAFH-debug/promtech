@@ -146,27 +146,6 @@ export default function DashboardPage() {
 
       {/* Tabs for Map, Statistics, and Search */}
       <Tabs aria-label="Dashboard tabs" className="mb-6">
-        <Tab key="statistics" title="Статистика">
-          {statsLoading ? (
-            <Card className="border border-divider">
-              <CardBody className="p-8">
-                <div className="flex items-center justify-center">
-                  <p className="text-default-400">Загрузка статистики...</p>
-                </div>
-              </CardBody>
-            </Card>
-          ) : dashboardStats ? (
-            <DashboardWidgets stats={dashboardStats} />
-          ) : (
-            <Card className="border border-divider">
-              <CardBody className="p-8">
-                <div className="flex items-center justify-center">
-                  <p className="text-default-400">Не удалось загрузить статистику</p>
-                </div>
-              </CardBody>
-            </Card>
-          )}
-        </Tab>
         <Tab key="map" title="Карта">
           {/* Map Filters */}
           <MapFiltersComponent
@@ -205,6 +184,27 @@ export default function DashboardPage() {
               <MapDraw height="700px" objects={mapObjects} filters={filters} />
             </CardBody>
           </Card>
+        </Tab>
+        <Tab key="statistics" title="Статистика">
+          {statsLoading ? (
+            <Card className="border border-divider">
+              <CardBody className="p-8">
+                <div className="flex items-center justify-center">
+                  <p className="text-default-400">Загрузка статистики...</p>
+                </div>
+              </CardBody>
+            </Card>
+          ) : dashboardStats ? (
+            <DashboardWidgets stats={dashboardStats} />
+          ) : (
+            <Card className="border border-divider">
+              <CardBody className="p-8">
+                <div className="flex items-center justify-center">
+                  <p className="text-default-400">Не удалось загрузить статистику</p>
+                </div>
+              </CardBody>
+            </Card>
+          )}
         </Tab>
         <Tab key="search" title="Поиск и фильтры">
           <ObjectSearch />
