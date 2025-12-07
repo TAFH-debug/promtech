@@ -162,3 +162,45 @@ export async function fetchImportHistory(): Promise<FileImportHistory[]> {
   return response.json();
 }
 
+// ML Metrics Types
+export interface MLMetrics {
+  metric_id: number;
+  training_accuracy: number;
+  test_accuracy: number;
+  train_samples: number;
+  test_samples: number;
+  training_report: {
+    [key: string]: any;
+  };
+  test_report: {
+    [key: string]: any;
+  };
+  label_distribution: {
+    [key: string]: number;
+  };
+  predicted_count: number;
+  created_at: string;
+}
+
+export async function fetchMLMetrics(): Promise<MLMetrics[]> {
+  const url = `${API_BASE_URL}/ml/metrics`;
+  const response = await fetch(url);
+  
+  if (!response.ok) {
+    throw new Error(`Failed to fetch ML metrics: ${response.statusText}`);
+  }
+  
+  return response.json();
+}
+
+export async function fetchLatestMLMetrics(): Promise<MLMetrics> {
+  const url = `${API_BASE_URL}/ml/metrics/latest`;
+  const response = await fetch(url);
+  
+  if (!response.ok) {
+    throw new Error(`Failed to fetch latest ML metrics: ${response.statusText}`);
+  }
+  
+  return response.json();
+}
+

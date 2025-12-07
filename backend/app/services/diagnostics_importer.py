@@ -1,4 +1,5 @@
 from datetime import datetime
+import logging
 
 import pandas as pd
 from fastapi import HTTPException
@@ -13,17 +14,15 @@ from app.services.import_helpers import (
     normalize_quality_grade,
     to_bool,
 )
+from app.services.ml_service import ml_service
+
+logger = logging.getLogger(__name__)
 
 
 def import_diagnostics(df: pd.DataFrame, db: Session, errors: list) -> tuple[int, int]:
-    """
-    Faster bulk-style import: validate rows, add inspections in one batch,
-    flush once to get IDs, then add related defects and commit once.
-    """
     created_count = 0
     inspections_to_add: list[tuple[Inspection, dict | None]] = []
 
-    # Preload existing object IDs to avoid per-row lookups
     object_ids: set[int] = set()
     for val in df.get("object_id", []):
         if not pd.notna(val):
@@ -31,8 +30,8 @@ def import_diagnostics(df: pd.DataFrame, db: Session, errors: list) -> tuple[int
         try:
             object_ids.add(int(val))
         except Exception:
-            # keep per-row validation handling in the main loop
             continue
+
     existing_object_ids: set[int] = set()
     if object_ids:
         found = db.exec(select(Object.object_id).where(Object.object_id.in_(object_ids))).all()
@@ -92,7 +91,7 @@ def import_diagnostics(df: pd.DataFrame, db: Session, errors: list) -> tuple[int
 
     try:
         db.add_all([pair[0] for pair in inspections_to_add])
-        db.flush()  # populate inspection_id for all inspections
+        db.flush()
 
         defects_to_add: list[Defect] = []
         for inspection, defect_data in inspections_to_add:
@@ -115,6 +114,37 @@ def import_diagnostics(df: pd.DataFrame, db: Session, errors: list) -> tuple[int
 
         db.commit()
         defects_created = len([d for _, d in inspections_to_add if d is not None])
+        
+        # Prepare data for ML training
+        try:
+            # Build DataFrame from imported inspections with defect data
+            ml_df = df[['method', 'temperature', 'humidity', 'illumination', 'param1', 'param2', 'param3', 'defect_found', 'quality_grade', 'date', 'ml_label']]
+            labeled_df = ml_df[ml_df['ml_label'].notna()].copy()
+            prediction_results = None
+            
+            if len(labeled_df) > 0:
+                print(f"Training ML model on {len(labeled_df)} labeled samples...")
+                train_metrics, test_metrics = ml_service.train(labeled_df, db)
+                
+                if train_metrics:
+                    print(f"Model training completed. Train accuracy: {train_metrics.get('accuracy', 0):.4f}, "
+                                f"Test accuracy: {test_metrics.get('accuracy', 0):.4f}")
+                    
+                    # Predict for unlabeled data
+                    unlabeled_df = ml_df[ml_df['ml_label'].isna()].copy()
+                    if len(unlabeled_df) > 0:
+                        print(f"Predicting labels for {len(unlabeled_df)} unlabeled samples...")
+                        prediction_results = ml_service.predict_unlabeled(unlabeled_df, db)
+                        
+                        if prediction_results.get('predicted', 0) > 0:
+                            print(f"Predicted labels for {prediction_results['predicted']} unlabeled diagnostics. "
+                                        f"Distribution: {prediction_results.get('label_distribution', {})}")
+                    
+                    # Save metrics to database
+                    ml_service.save_metrics(db, train_metrics, test_metrics, prediction_results)
+        except Exception as ml_exc:
+            logger.error(f"ML service error: {ml_exc}", exc_info=True)
+        
         return created_count, defects_created
     except Exception as exc:
         db.rollback()

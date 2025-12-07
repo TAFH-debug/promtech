@@ -9,3 +9,5 @@ pydantic-settings
 psycopg2
 pandas
 openpyxl
+lightgbm
+scikit-learn

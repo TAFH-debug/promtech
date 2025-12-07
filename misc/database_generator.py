@@ -10,8 +10,8 @@ for i in range(100):
         'object_name': f'Object{i}',
         'object_type': 'pipeline section',
         'pipeline_id': 'MT-01',
-        'lat': center[0] + (i * 0.0001) + (random.random()) / 2000,
-        'lon': center[1] + (i * 0.0001) + (random.random()) / 2000,
+        'lat': center[0] + (i * 0.0001) + (random.random()) / 10000,
+        'lon': center[1] + (i * 0.0001) + (random.random()) / 10000,
         'year': 2000 + (i % 21),
         'material': 'Steel-200' if i % 2 == 0 else 'Concrete',
         'created_at': f'2023-01-01',
@@ -20,4 +20,4 @@ for i in range(100):
     datal.append(data)
 
 df=pd.DataFrame(datal)
-df.to_csv('output.csv', index=False)
+df.to_csv('objects.csv', index=False)

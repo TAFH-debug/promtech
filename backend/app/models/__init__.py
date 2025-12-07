@@ -3,6 +3,7 @@ from app.models.pipeline import Pipeline
 from app.models.inspection import Inspection
 from app.models.defect import Defect
 from app.models.file_import import FileImport, FileImportRead
+from app.models.ml_metrics import MLMetrics, MLMetricsRead
 from app.models.diagnostic import (
     Diagnostic,
     DiagnosticCreate,
@@ -25,6 +26,8 @@ __all__ = [
     "Defect",
     "FileImport",
     "FileImportRead",
+    "MLMetrics",
+    "MLMetricsRead",
     "Diagnostic",
     "DiagnosticCreate",
     "DiagnosticUpdate",

@@ -7,9 +7,10 @@ import { MapPin } from "lucide-react";
 import { useEffect, useState } from "react";
 import { MapFiltersComponent } from "@/components/map-filters";
 import { ObjectSearch } from "@/components/object-search";
-import { fetchMapObjects, MapObject, MapFilters, fetchDashboardStats, DashboardStats } from "@/lib/api";
+import { fetchMapObjects, MapObject, MapFilters, fetchDashboardStats, DashboardStats, fetchMLMetrics, MLMetrics } from "@/lib/api";
 import { Tabs, Tab } from "@heroui/tabs";
 import { DashboardWidgets } from "@/components/dashboard-widgets";
+import { MLMetricsWidget } from "@/components/ml-metrics";
 
 const MapDraw = dynamic(() => import("@/components/map-draw").then((mod) => ({ default: mod.MapDraw })), {
   ssr: false,
@@ -29,6 +30,8 @@ export default function DashboardPage() {
   const [filters, setFilters] = useState<MapFilters>({});
   const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
+  const [mlMetrics, setMLMetrics] = useState<MLMetrics[]>([]);
+  const [mlMetricsLoading, setMLMetricsLoading] = useState(true);
 
   useEffect(() => {
     const loadMapObjects = async () => {
@@ -61,6 +64,22 @@ export default function DashboardPage() {
       }
     };
     loadDashboardStats();
+  }, []);
+
+  useEffect(() => {
+    const loadMLMetrics = async () => {
+      setMLMetricsLoading(true);
+      try {
+        const metrics = await fetchMLMetrics();
+        setMLMetrics(metrics);
+      } catch (error) {
+        console.error("Error fetching ML metrics:", error);
+        setMLMetrics([]);
+      } finally {
+        setMLMetricsLoading(false);
+      }
+    };
+    loadMLMetrics();
   }, []);
 
   const handleFiltersChange = (newFilters: MapFilters) => {
@@ -189,6 +208,9 @@ export default function DashboardPage() {
         </Tab>
         <Tab key="search" title="Поиск и фильтры">
           <ObjectSearch />
+        </Tab>
+        <Tab key="ml-metrics" title="ML Метрики">
+          <MLMetricsWidget metrics={mlMetrics} loading={mlMetricsLoading} />
         </Tab>
       </Tabs>
     </main>
