@@ -56,6 +56,8 @@ def generate_record(diag_id, object_id):
         "param1": param1, 
         "param2": param2,
         "param3": param3,
+        "depth": param1, 
+        "defect_type": random.choice(["corrosion", "crack", "deformation", "leakage"]) if defect_found else None,
         "ml_label": random.choice([None, compute_ml_label(param1, param2, param3, temperature, humidity)]),
     }
 
@@ -72,7 +74,7 @@ def generate_dataset(n_records=1000, object_ids=[]):
 
 object_idx = pd.read_csv("objects.csv")['object_id'].tolist()
 # --- Генерация ---
-df = generate_dataset(1000, object_idx)
+df = generate_dataset(2000, object_idx)
 df.to_csv("diagnostic_data.csv", index=False)
 
 print("Generated 1000 rows → diagnostic_data.csv")

@@ -68,7 +68,7 @@ export function MapFiltersComponent({
             }}
           >
             {PIPELINES.map((pipeline) => (
-              <SelectItem key={pipeline} value={pipeline}>
+              <SelectItem key={pipeline}>
                 {pipeline}
               </SelectItem>
             ))}
@@ -85,7 +85,7 @@ export function MapFiltersComponent({
             }}
           >
             {METHODS.map((method) => (
-              <SelectItem key={method} value={method}>
+              <SelectItem key={method}>
                 {method}
               </SelectItem>
             ))}

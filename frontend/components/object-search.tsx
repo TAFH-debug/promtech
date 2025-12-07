@@ -107,7 +107,7 @@ export function ObjectSearch() {
             }}
           >
             {PIPELINES.map((pipeline) => (
-              <SelectItem key={pipeline} value={pipeline}>
+              <SelectItem key={pipeline}>
                 {pipeline}
               </SelectItem>
             ))}
@@ -123,7 +123,7 @@ export function ObjectSearch() {
             }}
           >
             {METHODS.map((method) => (
-              <SelectItem key={method} value={method}>
+              <SelectItem key={method}>
                 {method}
               </SelectItem>
             ))}
@@ -147,13 +147,13 @@ export function ObjectSearch() {
             }}
             className="w-40"
           >
-            <SelectItem key="date" value="date">
+            <SelectItem key="date">
               По дате
             </SelectItem>
-            <SelectItem key="depth" value="depth">
+            <SelectItem key="depth">
               По глубине
             </SelectItem>
-            <SelectItem key="name" value="name">
+            <SelectItem key="name">
               По названию
             </SelectItem>
           </Select>
@@ -167,10 +167,10 @@ export function ObjectSearch() {
             }}
             className="w-32"
           >
-            <SelectItem key="desc" value="desc">
+            <SelectItem key="desc">
               Убывание
             </SelectItem>
-            <SelectItem key="asc" value="asc">
+            <SelectItem key="asc">
               Возрастание
             </SelectItem>
           </Select>
