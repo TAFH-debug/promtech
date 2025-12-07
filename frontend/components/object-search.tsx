@@ -5,8 +5,8 @@ import { Select, SelectItem } from "@heroui/select";
 import { Button } from "@heroui/button";
 import { Card, CardBody, CardHeader } from "@heroui/card";
 import { Table, TableHeader, TableColumn, TableBody, TableRow, TableCell } from "@heroui/table";
-import { ObjectSearchParams, ObjectTableRow, searchObjects } from "@/lib/api";
-import { Search, ArrowUpDown } from "lucide-react";
+import { ObjectSearchParams, ObjectTableRow, searchObjects, downloadPipelineReport } from "@/lib/api";
+import { Search, ArrowUpDown, FileDown, Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
 
 const PIPELINES = ["MT-01", "MT-02", "MT-03"];
@@ -33,6 +33,7 @@ export function ObjectSearch() {
   });
   const [results, setResults] = useState<ObjectTableRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [downloadingReports, setDownloadingReports] = useState<Set<string>>(new Set());
 
   const handleSearch = async () => {
     setLoading(true);
@@ -54,6 +55,29 @@ export function ObjectSearch() {
   const updateParam = (key: keyof ObjectSearchParams, value: any) => {
     setSearchParams({ ...searchParams, [key]: value });
   };
+
+  const handleDownloadReport = async (pipelineId: string) => {
+    if (!pipelineId || downloadingReports.has(pipelineId)) return;
+    
+    setDownloadingReports((prev) => new Set(prev).add(pipelineId));
+    try {
+      await downloadPipelineReport(pipelineId);
+    } catch (error) {
+      console.error(`Error downloading report for ${pipelineId}:`, error);
+      alert(`Ошибка при скачивании отчета для ${pipelineId}`);
+    } finally {
+      setDownloadingReports((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(pipelineId);
+        return newSet;
+      });
+    }
+  };
+
+  // Get unique pipeline IDs from results
+  const uniquePipelines = Array.from(
+    new Set(results.filter(r => r.pipeline_id).map(r => r.pipeline_id!))
+  );
 
   return (
     <Card className="border border-divider">
@@ -174,6 +198,7 @@ export function ObjectSearch() {
               <TableColumn>Статус</TableColumn>
               <TableColumn>Тип дефекта</TableColumn>
               <TableColumn>Глубина (мм)</TableColumn>
+              <TableColumn>Отчет</TableColumn>
             </TableHeader>
             <TableBody emptyContent="Нет данных">
               {results.map((row) => (
@@ -207,11 +232,74 @@ export function ObjectSearch() {
                   </TableCell>
                   <TableCell>{row.defect_type || "N/A"}</TableCell>
                   <TableCell>{row.max_depth.toFixed(2)}</TableCell>
+                  <TableCell>
+                    {row.pipeline_id ? (
+                      <Button
+                        size="sm"
+                        variant="flat"
+                        color="primary"
+                        isIconOnly
+                        onPress={() => handleDownloadReport(row.pipeline_id!)}
+                        isLoading={downloadingReports.has(row.pipeline_id)}
+                        isDisabled={downloadingReports.has(row.pipeline_id)}
+                        title={`Скачать отчет для ${row.pipeline_id}`}
+                      >
+                        {downloadingReports.has(row.pipeline_id) ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <FileDown className="h-4 w-4" />
+                        )}
+                      </Button>
+                    ) : (
+                      <span className="text-default-400 text-xs">N/A</span>
+                    )}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </div>
+
+        {/* Pipeline Reports Section */}
+        {uniquePipelines.length > 0 && (
+          <div className="mt-6">
+            <Card className="border border-divider">
+              <CardHeader className="pb-3">
+                <div className="flex items-center gap-2">
+                  <FileDown className="h-5 w-5" />
+                  <h3 className="text-lg font-semibold">Отчеты по трубопроводам</h3>
+                </div>
+              </CardHeader>
+              <CardBody>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {uniquePipelines.map((pipelineId) => (
+                    <div
+                      key={pipelineId}
+                      className="flex items-center justify-between p-3 border border-divider rounded-lg hover:bg-default-50 transition-colors"
+                    >
+                      <span className="font-semibold">{pipelineId}</span>
+                      <Button
+                        size="sm"
+                        color="primary"
+                        variant="flat"
+                        onPress={() => handleDownloadReport(pipelineId)}
+                        isLoading={downloadingReports.has(pipelineId)}
+                        isDisabled={downloadingReports.has(pipelineId)}
+                        startContent={
+                          !downloadingReports.has(pipelineId) && (
+                            <FileDown className="h-4 w-4" />
+                          )
+                        }
+                      >
+                        {downloadingReports.has(pipelineId) ? "Загрузка..." : "Скачать PDF"}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </CardBody>
+            </Card>
+          </div>
+        )}
 
         {/* Pagination */}
         <div className="flex items-center justify-between mt-4">

@@ -99,8 +99,7 @@ async def chat_with_bot(
         system_context = get_system_context(db)
         
         # Initialize model
-        model = genai.GenerativeModel('gemini-pro')
-        
+        model = genai.GenerativeModel('gemini-2.5-flash')
         # Create prompt with context
         prompt = f"{system_context}\n\nПользователь: {message.message}\n\nАссистент:"
         

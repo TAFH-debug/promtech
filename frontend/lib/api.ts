@@ -204,3 +204,24 @@ export async function fetchLatestMLMetrics(): Promise<MLMetrics> {
   return response.json();
 }
 
+// Reports
+export async function downloadPipelineReport(pipelineId: string): Promise<void> {
+  const url = `${API_BASE_URL}/reports/${pipelineId}/pdf`;
+  const response = await fetch(url);
+  
+  if (!response.ok) {
+    throw new Error(`Failed to download report: ${response.statusText}`);
+  }
+  
+  // Get blob and create download link
+  const blob = await response.blob();
+  const downloadUrl = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = downloadUrl;
+  link.download = `Report_${pipelineId}.pdf`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(downloadUrl);
+}
+

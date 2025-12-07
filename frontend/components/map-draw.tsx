@@ -6,6 +6,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "leaflet-draw/dist/leaflet.draw.css";
 import "leaflet-draw";
+import { FileDown, Loader2 } from "lucide-react";
 
 // Fix for default marker icons in Next.js
 if (typeof window !== "undefined") {
@@ -17,7 +18,7 @@ if (typeof window !== "undefined") {
   });
 }
 
-import { MapObject } from "@/lib/api";
+import { MapObject, downloadPipelineReport } from "@/lib/api";
 
 interface MapDrawProps {
   height?: string;
@@ -92,7 +93,143 @@ interface Line {
 }
 
 // Component to handle marker rendering and ensure proper cleanup
+// Popup content component
+function PopupContent({ point, onDownloadReport, isDownloading }: { 
+  point: Point; 
+  onDownloadReport: (pipelineId: string) => void;
+  isDownloading: boolean;
+}) {
+  return (
+    <div className="p-2 min-w-[250px]">
+      <h3 className="font-bold text-lg mb-2">{point.name || `Точка ${point.id}`}</h3>
+      {point.objectType && (
+        <p className="text-sm mb-1">
+          <span className="font-semibold">Тип:</span> {point.objectType}
+        </p>
+      )}
+      {point.pipelineId && (
+        <p className="text-sm mb-1">
+          <span className="font-semibold">Трубопровод:</span> {point.pipelineId}
+        </p>
+      )}
+      {point.year && (
+        <p className="text-sm mb-1">
+          <span className="font-semibold">Год:</span> {point.year}
+        </p>
+      )}
+      {point.material && (
+        <p className="text-sm mb-1">
+          <span className="font-semibold">Материал:</span> {point.material}
+        </p>
+      )}
+      {point.popupData && (
+        <>
+          {point.popupData.last_check_date && (
+            <p className="text-sm mb-1">
+              <span className="font-semibold">Последняя проверка:</span> {point.popupData.last_check_date}
+            </p>
+          )}
+          {point.popupData.method && (
+            <p className="text-sm mb-1">
+              <span className="font-semibold">Метод:</span> {point.popupData.method}
+            </p>
+          )}
+          {point.popupData.quality_grade && (
+            <p className="text-sm mb-1">
+              <span className="font-semibold">Оценка:</span> {point.popupData.quality_grade}
+            </p>
+          )}
+          {point.popupData.max_depth !== undefined && point.popupData.max_depth !== null && (
+            <p className="text-sm mb-1">
+              <span className="font-semibold">Макс. глубина:</span> {point.popupData.max_depth.toFixed(2)} мм
+            </p>
+          )}
+          {point.popupData.defect_count > 0 && (
+            <p className="text-sm mb-1 text-red-600">
+              <span className="font-semibold">Дефектов:</span> {point.popupData.defect_count}
+            </p>
+          )}
+          {point.criticality && (
+            <p className="text-sm mb-1">
+              <span className="font-semibold">Критичность:</span>{" "}
+              <span
+                className={`inline-block px-2 py-1 rounded text-xs ${
+                  point.criticality === "high"
+                    ? "bg-red-100 text-red-800"
+                    : point.criticality === "medium"
+                    ? "bg-orange-100 text-orange-800"
+                    : "bg-green-100 text-green-800"
+                }`}
+              >
+                {point.criticality === "high"
+                  ? "Высокая"
+                  : point.criticality === "medium"
+                  ? "Средняя"
+                  : "Нормальная"}
+              </span>
+            </p>
+          )}
+        </>
+      )}
+      {point.status && (
+        <p className="text-sm mb-1">
+          <span className="font-semibold">Статус:</span>{" "}
+          {point.status === "defect"
+            ? "Дефект"
+            : point.status === "clean"
+            ? "Чисто"
+            : "Неизвестно"}
+        </p>
+      )}
+      <p className="text-xs text-gray-500 mt-2">
+        Координаты: {point.lat.toFixed(6)}, {point.lng.toFixed(6)}
+      </p>
+      {point.pipelineId && (
+        <div className="mt-3 pt-3 border-t border-gray-200">
+          <button
+            onClick={() => onDownloadReport(point.pipelineId!)}
+            disabled={isDownloading}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-primary text-white rounded hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors"
+          >
+            {isDownloading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Загрузка...</span>
+              </>
+            ) : (
+              <>
+                <FileDown className="h-4 w-4" />
+                <span>Скачать отчет {point.pipelineId}</span>
+              </>
+            )}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function MarkersGroup({ points }: { points: Point[] }) {
+  const [downloadingReports, setDownloadingReports] = useState<Set<string>>(new Set());
+
+  const handleDownloadReport = async (pipelineId: string) => {
+    if (!pipelineId || downloadingReports.has(pipelineId)) return;
+    
+    setDownloadingReports((prev) => new Set(prev).add(pipelineId));
+    try {
+      await downloadPipelineReport(pipelineId);
+    } catch (error) {
+      console.error(`Error downloading report for ${pipelineId}:`, error);
+      alert(`Ошибка при скачивании отчета для ${pipelineId}`);
+    } finally {
+      setDownloadingReports((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(pipelineId);
+        return newSet;
+      });
+    }
+  };
+
   // Use useMemo to ensure markers are properly recreated when points change
   const markers = useMemo(() => {
     return points.map((point) => {
@@ -106,96 +243,16 @@ function MarkersGroup({ points }: { points: Point[] }) {
           icon={icon}
         >
             <Popup>
-              <div className="p-2 min-w-[250px]">
-                <h3 className="font-bold text-lg mb-2">{point.name || `Точка ${point.id}`}</h3>
-                {point.objectType && (
-                  <p className="text-sm mb-1">
-                    <span className="font-semibold">Тип:</span> {point.objectType}
-                  </p>
-                )}
-                {point.pipelineId && (
-                  <p className="text-sm mb-1">
-                    <span className="font-semibold">Трубопровод:</span> {point.pipelineId}
-                  </p>
-                )}
-                {point.year && (
-                  <p className="text-sm mb-1">
-                    <span className="font-semibold">Год:</span> {point.year}
-                  </p>
-                )}
-                {point.material && (
-                  <p className="text-sm mb-1">
-                    <span className="font-semibold">Материал:</span> {point.material}
-                  </p>
-                )}
-                {point.popupData && (
-                  <>
-                    {point.popupData.last_check_date && (
-                      <p className="text-sm mb-1">
-                        <span className="font-semibold">Последняя проверка:</span> {point.popupData.last_check_date}
-                      </p>
-                    )}
-                    {point.popupData.method && (
-                      <p className="text-sm mb-1">
-                        <span className="font-semibold">Метод:</span> {point.popupData.method}
-                      </p>
-                    )}
-                    {point.popupData.quality_grade && (
-                      <p className="text-sm mb-1">
-                        <span className="font-semibold">Оценка:</span> {point.popupData.quality_grade}
-                      </p>
-                    )}
-                    {point.popupData.max_depth !== undefined && point.popupData.max_depth !== null && (
-                      <p className="text-sm mb-1">
-                        <span className="font-semibold">Макс. глубина:</span> {point.popupData.max_depth.toFixed(2)} мм
-                      </p>
-                    )}
-                    {point.popupData.defect_count > 0 && (
-                      <p className="text-sm mb-1 text-red-600">
-                        <span className="font-semibold">Дефектов:</span> {point.popupData.defect_count}
-                      </p>
-                    )}
-                    {point.criticality && (
-                      <p className="text-sm mb-1">
-                        <span className="font-semibold">Критичность:</span>{" "}
-                        <span
-                          className={`inline-block px-2 py-1 rounded text-xs ${
-                            point.criticality === "high"
-                              ? "bg-red-100 text-red-800"
-                              : point.criticality === "medium"
-                              ? "bg-orange-100 text-orange-800"
-                              : "bg-green-100 text-green-800"
-                          }`}
-                        >
-                          {point.criticality === "high"
-                            ? "Высокая"
-                            : point.criticality === "medium"
-                            ? "Средняя"
-                            : "Нормальная"}
-                        </span>
-                      </p>
-                    )}
-                  </>
-                )}
-                {point.status && (
-                  <p className="text-sm mb-1">
-                    <span className="font-semibold">Статус:</span>{" "}
-                    {point.status === "defect"
-                      ? "Дефект"
-                      : point.status === "clean"
-                      ? "Чисто"
-                      : "Неизвестно"}
-                  </p>
-                )}
-                <p className="text-xs text-gray-500 mt-2">
-                  Координаты: {point.lat.toFixed(6)}, {point.lng.toFixed(6)}
-                </p>
-              </div>
+              <PopupContent
+                point={point}
+                onDownloadReport={handleDownloadReport}
+                isDownloading={downloadingReports.has(point.pipelineId || "")}
+              />
             </Popup>
           </Marker>
         );
     });
-  }, [points]);
+  }, [points, downloadingReports]);
 
   return <>{markers}</>;
 }
