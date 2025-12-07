@@ -98,6 +98,7 @@ export default function DashboardPage() {
     normal: mapObjects.filter((o) => o.criticality === "normal").length,
     defects: mapObjects.filter((o) => o.status === "defect").length,
   };
+
   return (
     <main className="p-4 md:p-6 lg:p-8">
       {/* Header */}

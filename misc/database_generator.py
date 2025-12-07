@@ -21,3 +21,5 @@ for i in range(100):
 
 df=pd.DataFrame(datal)
 df.to_csv('objects.csv', index=False)
+
+

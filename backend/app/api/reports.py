@@ -1,10 +1,12 @@
 import io
 import os
 import tempfile
+import base64
 from datetime import datetime
 from typing import List, Dict, Tuple, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select
 from sqlalchemy import func
@@ -34,6 +36,10 @@ from app.models.inspection import Inspection
 from app.models.defect import Defect
 
 router = APIRouter()
+
+
+class ReportRequest(BaseModel):
+    map_image: Optional[str] = None
 
 class ReportTheme:
     PRIMARY = colors.HexColor("#2C3E50")  
@@ -335,12 +341,13 @@ def generate_map_image(objects: List[Object], defects: List[Dict], pipeline_id: 
         print(f"Error generating map: {e}")
         return None
 
-def build_site_map(objects: List[Object], defects: List[Dict], pipeline_id: str, styles) -> List:
+def build_site_map(objects: List[Object], defects: List[Dict], pipeline_id: str, styles, map_image_bytes: Optional[io.BytesIO] = None) -> List:
     """Создает секцию карты с реальной картой или placeholder"""
     story = []
     story.append(Paragraph("Visual Inspection Map", styles["SectionHeader"]))
     
-    map_image = generate_map_image(objects, defects, pipeline_id)
+    # Используем переданное изображение или генерируем новое
+    map_image = map_image_bytes
     
     if map_image:
         # Вставляем изображение карты
@@ -416,10 +423,43 @@ def _collect_defects_from_db(pipeline_id: str, db: Session) -> Tuple[List[Dict],
         })
     return collected, list(objects), len(objects)
 
-@router.get("/{pipeline_id}/pdf", response_class=StreamingResponse)
-def pipeline_report_pdf(pipeline_id: str, db: Session = Depends(get_db)):
+@router.post("/{pipeline_id}/pdf", response_class=StreamingResponse)
+def pipeline_report_pdf(
+    pipeline_id: str,
+    request: ReportRequest,
+    db: Session = Depends(get_db)
+):
     defects, objects, obj_count = _collect_defects_from_db(pipeline_id, db)
     meta = {"pipeline_id": pipeline_id, "object_count": obj_count}
+
+    # Обрабатываем переданное изображение карты
+    map_image_bytes = None
+    map_image = request.map_image
+    if map_image:
+        try:
+            # Добавляем padding если нужно (base64 должен быть кратен 4)
+            missing_padding = len(map_image) % 4
+            if missing_padding:
+                map_image += '=' * (4 - missing_padding)
+            
+            # Декодируем base64
+            image_data = base64.b64decode(map_image, validate=True)
+            # Открываем изображение и изменяем размер
+            img = PILImage.open(io.BytesIO(image_data))
+            # Изменяем размер для PDF
+            max_width = int(A4[0] - 40*mm)
+            max_height = int(200*mm)
+            img.thumbnail((max_width, max_height), PILImage.Resampling.LANCZOS)
+            # Сохраняем в BytesIO
+            map_image_bytes = io.BytesIO()
+            img.save(map_image_bytes, format='PNG')
+            map_image_bytes.seek(0)
+        except Exception as e:
+            print(f"Error processing map image: {e}")
+            import traceback
+            traceback.print_exc()
+            map_image_bytes = None
+    
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, 
                             rightMargin=20*mm, leftMargin=20*mm, 
@@ -438,7 +478,7 @@ def pipeline_report_pdf(pipeline_id: str, db: Session = Depends(get_db)):
     story += build_cover(meta, styles)
     
     story += build_general_stats(defects, styles)
-    story += build_site_map(objects, defects, pipeline_id, styles)
+    story += build_site_map(objects, defects, pipeline_id, styles, map_image_bytes)
     story += build_defects_table(defects, styles)
 
     doc.build(story)

@@ -18,7 +18,8 @@ if (typeof window !== "undefined") {
   });
 }
 
-import { MapObject, downloadPipelineReport } from "@/lib/api";
+import { MapObject, downloadPipelineReport, captureMapImage } from "@/lib/api";
+import html2canvas from 'html2canvas-pro';
 
 interface MapDrawProps {
   height?: string;
@@ -217,10 +218,32 @@ function MarkersGroup({ points }: { points: Point[] }) {
     
     setDownloadingReports((prev) => new Set(prev).add(pipelineId));
     try {
-      await downloadPipelineReport(pipelineId);
+      const mapElement = document.querySelector('.leaflet-container') as HTMLElement;
+
+      if (!mapElement) {
+        alert("Карта не найдена!");
+        return;
+      }
+      
+      const controls = mapElement.querySelector('.leaflet-control-container') as HTMLElement;
+      const popup = mapElement.querySelector('.leaflet-popup-pane') as HTMLElement;
+      if (controls) controls.style.display = 'none';
+      if (popup) popup.style.display = 'none';
+      const canvas = await html2canvas(mapElement, {
+        useCORS: true, 
+        allowTaint: true,
+        logging: false,
+        scale: 2
+      });
+
+      if (controls) controls.style.display = 'block';
+      if (popup) popup.style.display = 'block';
+      const mapImage = canvas.toDataURL('image/png');
+
+      await downloadPipelineReport(pipelineId, mapImage!);
     } catch (error) {
       console.error(`Error downloading report for ${pipelineId}:`, error);
-      alert(`Ошибка при скачивании отчета для ${pipelineId}`);
+      alert(`Ошибка при скачивании отчета для ${pipelineId} ${error}`);
     } finally {
       setDownloadingReports((prev) => {
         const newSet = new Set(prev);

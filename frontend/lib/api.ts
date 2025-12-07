@@ -205,9 +205,54 @@ export async function fetchLatestMLMetrics(): Promise<MLMetrics> {
 }
 
 // Reports
-export async function downloadPipelineReport(pipelineId: string): Promise<void> {
+export async function captureMapImage(): Promise<string | null> {
+  if (typeof window === 'undefined') return null;
+  
+  const mapElement = document.querySelector('.leaflet-container');
+  if (!mapElement) {
+    console.warn("Карта не найдена!");
+    return null;
+  }
+
+  try {
+    const html2canvas = (await import('html2canvas-pro')).default;
+    const controls = mapElement.querySelector('.leaflet-control-container') as HTMLElement;
+    
+    if (controls) controls.style.display = 'none';
+
+    const canvas = await html2canvas(mapElement as HTMLElement, {
+      useCORS: true,
+      allowTaint: true,
+      logging: false,
+      scale: 2
+    });
+
+    if (controls) controls.style.display = 'block';
+
+    const mapImageBase64 = canvas.toDataURL('image/png');
+    return mapImageBase64;
+  } catch (error) {
+    console.error("Ошибка при создании скриншота:", error);
+    const controls = mapElement.querySelector('.leaflet-control-container') as HTMLElement;
+    if (controls) controls.style.display = 'block';
+    return null;
+  }
+}
+
+export async function downloadPipelineReport(pipelineId: string, mapImage?: string | null): Promise<void> {
   const url = `${API_BASE_URL}/reports/${pipelineId}/pdf`;
-  const response = await fetch(url);
+  
+  const base64Data = mapImage ? mapImage.replace(/^data:image\/png;base64,/, '') : null;
+  
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      map_image: base64Data
+    })
+  });
   
   if (!response.ok) {
     throw new Error(`Failed to download report: ${response.statusText}`);
