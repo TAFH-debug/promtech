@@ -9,3 +9,4 @@ pydantic-settings
 psycopg2
 pandas
 openpyxl
+reportlab

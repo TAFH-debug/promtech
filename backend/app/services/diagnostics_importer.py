@@ -23,7 +23,6 @@ def import_diagnostics(df: pd.DataFrame, db: Session, errors: list) -> tuple[int
     created_count = 0
     inspections_to_add: list[tuple[Inspection, dict | None]] = []
 
-    # Preload existing object IDs to avoid per-row lookups
     object_ids: set[int] = set()
     for val in df.get("object_id", []):
         if not pd.notna(val):
@@ -31,7 +30,6 @@ def import_diagnostics(df: pd.DataFrame, db: Session, errors: list) -> tuple[int
         try:
             object_ids.add(int(val))
         except Exception:
-            # keep per-row validation handling in the main loop
             continue
     existing_object_ids: set[int] = set()
     if object_ids:
@@ -92,7 +90,7 @@ def import_diagnostics(df: pd.DataFrame, db: Session, errors: list) -> tuple[int
 
     try:
         db.add_all([pair[0] for pair in inspections_to_add])
-        db.flush()  # populate inspection_id for all inspections
+        db.flush()  
 
         defects_to_add: list[Defect] = []
         for inspection, defect_data in inspections_to_add:
