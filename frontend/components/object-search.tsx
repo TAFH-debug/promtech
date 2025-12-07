@@ -52,7 +52,7 @@ export function ObjectSearch() {
   }, [searchParams.page, searchParams.size, searchParams.sort_by, searchParams.order]);
 
   const updateParam = (key: keyof ObjectSearchParams, value: any) => {
-    setSearchParams({ ...searchParams, [key]: value, page: 1 });
+    setSearchParams({ ...searchParams, [key]: value });
   };
 
   return (
@@ -231,7 +231,10 @@ export function ObjectSearch() {
               size="sm"
               variant="flat"
               isDisabled={results.length < (searchParams.size || 10)}
-              onPress={() => updateParam("page", (searchParams.page || 1) + 1)}
+              onPress={() => {
+                updateParam("page", (searchParams.page || 1) + 1);
+                handleSearch();
+              }}
             >
               Вперед
             </Button>

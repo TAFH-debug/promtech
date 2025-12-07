@@ -91,137 +91,6 @@ interface Line {
   id: string;
 }
 
-interface DrawControlProps {
-  onDraw: (type: string, data: any) => void;
-  initialPoints?: Point[];
-  initialLines?: Line[];
-}
-
-function DrawControl({ onDraw, initialPoints = [], initialLines = [] }: DrawControlProps) {
-  const map = useMap();
-  const drawnItemsRef = useRef<L.FeatureGroup>(new L.FeatureGroup());
-  const initializedRef = useRef(false);
-
-  useEffect(() => {
-    if (!map || initializedRef.current) return;
-
-    // Добавляем предустановленные точки и линии только один раз
-    initialPoints.forEach((point) => {
-      const marker = L.marker([point.lat, point.lng]);
-      (marker as any)._leaflet_id = point.id;
-      drawnItemsRef.current.addLayer(marker);
-    });
-
-    initialLines.forEach((line) => {
-      const latlngs = line.points.map((p) => [p.lat, p.lng] as [number, number]);
-      const polyline = L.polyline(latlngs, { color: "#3b82f6", weight: 4 });
-      (polyline as any)._leaflet_id = line.id;
-      drawnItemsRef.current.addLayer(polyline);
-    });
-
-    initializedRef.current = true;
-
-    // Add the draw control
-    const drawControl = new L.Control.Draw({
-      position: "topright",
-      draw: {
-        marker: {
-          icon: L.icon({
-            iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png",
-            iconSize: [25, 41],
-            iconAnchor: [12, 41],
-          }),
-        },
-        polyline: {
-          allowIntersection: false,
-          shapeOptions: {
-            color: "#3b82f6",
-            weight: 4,
-          },
-        },
-        polygon: false,
-        rectangle: false,
-        circle: false,
-        circlemarker: false,
-      },
-      edit: {
-        featureGroup: drawnItemsRef.current,
-        remove: true,
-      },
-    });
-
-    map.addControl(drawControl);
-    map.addLayer(drawnItemsRef.current);
-
-    // Handle draw events
-    const handleDrawCreated = (e: L.DrawEvents.Created) => {
-      const layer = e.layer;
-      drawnItemsRef.current.addLayer(layer);
-
-      if (layer instanceof L.Marker) {
-        const latlng = layer.getLatLng();
-        onDraw("marker", {
-          lat: latlng.lat,
-          lng: latlng.lng,
-          id: `marker-${Date.now()}`,
-        });
-      } else if (layer instanceof L.Polyline) {
-        const latlngs = layer.getLatLngs() as L.LatLng[];
-        onDraw("polyline", {
-          points: latlngs.map((ll, idx) => ({
-            lat: ll.lat,
-            lng: ll.lng,
-            id: `point-${Date.now()}-${idx}`,
-          })),
-          id: `line-${Date.now()}`,
-        });
-      }
-    };
-
-    const handleDrawDeleted = () => {
-      // Handle deletion if needed
-    };
-
-    const handleDrawEdited = (e: L.DrawEvents.Edited) => {
-      // Handle edit if needed
-      const layers = e.layers;
-      layers.eachLayer((layer) => {
-        if (layer instanceof L.Marker) {
-          const latlng = layer.getLatLng();
-          onDraw("marker-updated", {
-            lat: latlng.lat,
-            lng: latlng.lng,
-            id: (layer as any)._leaflet_id,
-          });
-        } else if (layer instanceof L.Polyline) {
-          const latlngs = layer.getLatLngs() as L.LatLng[];
-          onDraw("polyline-updated", {
-            points: latlngs.map((ll, idx) => ({
-              lat: ll.lat,
-              lng: ll.lng,
-              id: `point-${Date.now()}-${idx}`,
-            })),
-            id: (layer as any)._leaflet_id,
-          });
-        }
-      });
-    };
-
-    map.on(L.Draw.Event.CREATED, handleDrawCreated);
-    map.on(L.Draw.Event.DELETED, handleDrawDeleted);
-    map.on(L.Draw.Event.EDITED, handleDrawEdited);
-
-    return () => {
-      map.removeControl(drawControl);
-      map.off(L.Draw.Event.CREATED, handleDrawCreated);
-      map.off(L.Draw.Event.DELETED, handleDrawDeleted);
-      map.off(L.Draw.Event.EDITED, handleDrawEdited);
-    };
-  }, [map, onDraw, initialPoints, initialLines]);
-
-  return null;
-}
-
 // Component to handle marker rendering and ensure proper cleanup
 function MarkersGroup({ points }: { points: Point[] }) {
   // Use useMemo to ensure markers are properly recreated when points change
@@ -352,12 +221,9 @@ export function MapDraw({ height = "600px", objects = [], filters }: MapDrawProp
   const [points, setPoints] = useState<Point[]>(
     objects.length > 0 ? objectPoints : []
   );
-  
-  // Generate lines between pipeline sections of the same pipeline
   const pipelineLines = useMemo(() => {
     const lines: Line[] = [];
     
-    // Filter only pipeline sections
     const pipelineSections = points.filter(
       (point) => point.objectType === "pipeline section" && point.pipelineId
     );
@@ -371,33 +237,25 @@ export function MapDraw({ height = "600px", objects = [], filters }: MapDrawProp
       }
       sectionsByPipeline.get(pipelineId)!.push(section);
     });
-    
-    // For each pipeline, connect sections using a greedy nearest-neighbor approach
-    // This ensures each section is connected to its nearest unconnected neighbor
     sectionsByPipeline.forEach((sections, pipelineId) => {
       if (sections.length < 2) return;
       
-      // Track which sections are already connected (have at least one connection)
       const connectedSections = new Set<string>();
-      const createdConnections = new Set<string>(); // Track pairs to avoid duplicates
+      const createdConnections = new Set<string>();
       
-      // For each section, find the nearest unconnected section
       sections.forEach((currentSection) => {
-        // Find the nearest section that is not yet connected
         let nearest: Point | null = null;
         let minDistance = Infinity;
         
         sections.forEach((otherSection) => {
           if (currentSection.id === otherSection.id) return;
           
-          // Check if this connection already exists (in either direction)
           const connectionKey1 = `${currentSection.id}-${otherSection.id}`;
           const connectionKey2 = `${otherSection.id}-${currentSection.id}`;
-          if (createdConnections.has(connectionKey1) || createdConnections.has(connectionKey2)) {
+          if (createdConnections.has(connectionKey1) || createdConnections.has(connectionKey2) || connectedSections.has(otherSection.id)) {
             return;
           }
           
-          // Calculate distance using Haversine formula
           const distance = calculateDistance(
             currentSection.lat,
             currentSection.lng,
@@ -405,20 +263,19 @@ export function MapDraw({ height = "600px", objects = [], filters }: MapDrawProp
             otherSection.lng
           );
           
-          // Prefer connecting to unconnected sections, but allow connecting to connected ones if needed
           if (distance < minDistance) {
             minDistance = distance;
             nearest = otherSection;
           }
         });
         
-        // Create a line between current section and nearest section
         if (nearest) {
-          const connectionKey = `${currentSection.id}-${nearest.id}`;
+          const nearestPoint: Point = nearest;
+          const connectionKey = `${currentSection.id}-${nearestPoint.id}`;
           createdConnections.add(connectionKey);
           
           lines.push({
-            id: `pipeline-${pipelineId}-${currentSection.id}-${nearest.id}`,
+            id: `pipeline-${pipelineId}-${currentSection.id}-${nearestPoint.id}`,
             points: [
               {
                 id: `${currentSection.id}-start`,
@@ -426,23 +283,22 @@ export function MapDraw({ height = "600px", objects = [], filters }: MapDrawProp
                 lng: currentSection.lng,
               },
               {
-                id: `${nearest.id}-end`,
-                lat: nearest.lat,
-                lng: nearest.lng,
+                id: `${nearestPoint.id}-end`,
+                lat: nearestPoint.lat,
+                lng: nearestPoint.lng,
               },
             ],
           });
           
-          // Mark both sections as connected
           connectedSections.add(currentSection.id);
-          connectedSections.add(nearest.id);
+          connectedSections.add(nearestPoint.id);
         }
       });
     });
     return lines;
   }, [points]);
-  const [lines, setLines] = useState<Line[]>([]);
 
+  const [lines, setLines] = useState<Line[]>([]);
   // Update points when objects change - use useMemo to create a new array reference
   const pointsFromObjects = useMemo(() => {
     if (objects.length > 0) {
@@ -473,27 +329,13 @@ export function MapDraw({ height = "600px", objects = [], filters }: MapDrawProp
     setLines(pipelineLines);
   }, [pipelineLines]);
 
-  const handleDraw = (type: string, data: any) => {
-    if (type === "marker") {
-      setPoints((prev) => [...prev, data]);
-    } else if (type === "polyline") {
-      setLines((prev) => [...prev, data]);
-    } else if (type === "marker-updated") {
-      setPoints((prev) =>
-        prev.map((p) => (p.id === data.id ? { ...p, lat: data.lat, lng: data.lng } : p))
-      );
-    } else if (type === "polyline-updated") {
-      setLines((prev) =>
-        prev.map((l) => (l.id === data.id ? { ...l, points: data.points } : l))
-      );
-    }
-  };
-
   return (
     <div className="w-full rounded-lg overflow-hidden border border-divider" style={{ height }}>
       <MapContainer
-        center={[48.0196, 66.9237]} // Центр Казахстана
+        center={[51.1801, 71.446]} // Центр Казахстана
         zoom={6}
+        minZoom={3}
+        maxZoom={18}
         style={{ height: "100%", width: "100%" }}
         className="z-0"
       >
@@ -501,7 +343,6 @@ export function MapDraw({ height = "600px", objects = [], filters }: MapDrawProp
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        <DrawControl onDraw={handleDraw} initialPoints={points} />
         <MarkersGroup points={points} />
         {lines.map((line) => (
           <Polyline

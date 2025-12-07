@@ -7,8 +7,9 @@ import { MapPin } from "lucide-react";
 import { useEffect, useState } from "react";
 import { MapFiltersComponent } from "@/components/map-filters";
 import { ObjectSearch } from "@/components/object-search";
-import { fetchMapObjects, MapObject, MapFilters } from "@/lib/api";
+import { fetchMapObjects, MapObject, MapFilters, fetchDashboardStats, DashboardStats } from "@/lib/api";
 import { Tabs, Tab } from "@heroui/tabs";
+import { DashboardWidgets } from "@/components/dashboard-widgets";
 
 const MapDraw = dynamic(() => import("@/components/map-draw").then((mod) => ({ default: mod.MapDraw })), {
   ssr: false,
@@ -26,6 +27,8 @@ export default function DashboardPage() {
   const [mapObjects, setMapObjects] = useState<MapObject[]>([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState<MapFilters>({});
+  const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
 
   useEffect(() => {
     const loadMapObjects = async () => {
@@ -41,9 +44,24 @@ export default function DashboardPage() {
         setLoading(false);
       }
     };
-
     loadMapObjects();
   }, [filters]);
+
+  useEffect(() => {
+    const loadDashboardStats = async () => {
+      setStatsLoading(true);
+      try {
+        const stats = await fetchDashboardStats();
+        setDashboardStats(stats);
+      } catch (error) {
+        console.error("Error fetching dashboard stats:", error);
+        setDashboardStats(null);
+      } finally {
+        setStatsLoading(false);
+      }
+    };
+    loadDashboardStats();
+  }, []);
 
   const handleFiltersChange = (newFilters: MapFilters) => {
     setFilters(newFilters);
@@ -61,7 +79,6 @@ export default function DashboardPage() {
     normal: mapObjects.filter((o) => o.criticality === "normal").length,
     defects: mapObjects.filter((o) => o.status === "defect").length,
   };
-
   return (
     <div className="flex min-h-screen">
       <Sidebar />
@@ -111,8 +128,29 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {/* Tabs for Map and Search */}
+          {/* Tabs for Map, Statistics, and Search */}
           <Tabs aria-label="Dashboard tabs" className="mb-6">
+            <Tab key="statistics" title="Статистика">
+              {statsLoading ? (
+                <Card className="border border-divider">
+                  <CardBody className="p-8">
+                    <div className="flex items-center justify-center">
+                      <p className="text-default-400">Загрузка статистики...</p>
+                    </div>
+                  </CardBody>
+                </Card>
+              ) : dashboardStats ? (
+                <DashboardWidgets stats={dashboardStats} />
+              ) : (
+                <Card className="border border-divider">
+                  <CardBody className="p-8">
+                    <div className="flex items-center justify-center">
+                      <p className="text-default-400">Не удалось загрузить статистику</p>
+                    </div>
+                  </CardBody>
+                </Card>
+              )}
+            </Tab>
             <Tab key="map" title="Карта">
               {/* Map Filters */}
               <MapFiltersComponent
