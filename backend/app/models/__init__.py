@@ -2,6 +2,7 @@ from app.models.object import Object, ObjectCreate, ObjectUpdate, ObjectRead, Ob
 from app.models.pipeline import Pipeline
 from app.models.inspection import Inspection
 from app.models.defect import Defect
+from app.models.file_import import FileImport, FileImportRead
 from app.models.diagnostic import (
     Diagnostic,
     DiagnosticCreate,
@@ -22,6 +23,8 @@ __all__ = [
     "Pipeline",
     "Inspection",
     "Defect",
+    "FileImport",
+    "FileImportRead",
     "Diagnostic",
     "DiagnosticCreate",
     "DiagnosticUpdate",

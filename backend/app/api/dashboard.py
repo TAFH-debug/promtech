@@ -85,46 +85,40 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
         DefectByCriticality(criticality=criticality, count=count)
         for criticality, count in sorted(criticality_counts.items())
     ]
-    
-    # 3. Топ-5 рисков
-    # Объекты с наибольшим количеством дефектов и высокой критичностью
-    objects_with_risks = []
-    
-    # Получаем все объекты с их последними инспекциями
-    objects = db.exec(select(Object)).all()
-    
-    for obj in objects:
-        if obj.object_id is None:
-            continue
-            
-        # Получаем последнюю инспекцию для объекта
-        latest_inspection = db.exec(
-            select(Inspection)
-            .where(Inspection.object_id == obj.object_id)
-            .order_by(Inspection.date.desc())
-            .limit(1)
-        ).first()
-        
-        if latest_inspection:
-            # Считаем количество дефектов для этой инспекции
-            defects = db.exec(
-                select(Defect).where(Defect.inspection_id == latest_inspection.inspection_id)
-            ).all()
-            
-            defect_count = len(defects)
-            max_depth = max([d.depth for d in defects if d.depth is not None], default=None)
-            criticality = latest_inspection.ml_label.value if latest_inspection.ml_label else None
-            
-            # Учитываем объекты с дефектами или высокой критичностью
-            if defect_count > 0 or criticality in ["high", "medium"]:
-                objects_with_risks.append({
-                    "object_id": obj.object_id,
-                    "object_name": obj.object_name,
-                    "pipeline_id": obj.pipeline_id,
-                    "criticality": criticality,
-                    "defect_count": defect_count,
-                    "max_depth": max_depth,
-                })
+
+    rows = db.exec(
+        select(
+            Defect,
+            Inspection,
+            Object
+        )
+        .join(Inspection, Inspection.inspection_id == Defect.inspection_id)
+        .join(Object, Object.object_id == Inspection.object_id)
+    ).all()
+
+    risk_map = {}
+
+    for defect, inspection, obj in rows:
+        if obj.object_id not in risk_map:
+            risk_map[obj.object_id] = {
+                "object_id": obj.object_id,
+                "object_name": obj.object_name,
+                "pipeline_id": obj.pipeline_id,
+                "criticality": inspection.ml_label.value if inspection.ml_label else None,
+                "defect_count": 0,
+                "max_depth": None,
+            }
+
+        entry = risk_map[obj.object_id]
+        entry["defect_count"] += 1
+
+        if defect.depth is not None:
+            entry["max_depth"] = (
+                defect.depth if entry["max_depth"] is None 
+                else max(entry["max_depth"], defect.depth)
+            )
+
+    objects_with_risks = list(risk_map.values())
     
     # Сортируем по критичности (high > medium > normal) и количеству дефектов
     def risk_score(risk):

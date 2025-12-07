@@ -1,3 +1,4 @@
+import { Sidebar } from "@/components/sidebar";
 import { Link } from "@heroui/link";
 import { Metadata } from "next";
 
@@ -11,8 +12,11 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <>
-    {children}
-  </>;
+  return <div className="flex min-h-screen">
+      <Sidebar />
+      <div className="flex-1 lg:ml-16">
+        {children}
+      </div>
+    </div>;
 }
 
