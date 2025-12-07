@@ -18,7 +18,6 @@ def normalize_object_type(raw: str) -> ObjectType:
 
 def normalize_diagnostic_method(raw: str) -> DiagnosticMethod:
     value = (raw or "").strip().upper()
-    # Common aliases mapped to existing enum values (DB enum currently does not include UT)
     aliases = {
         "UT": "UZK",
         "УТ": "UZK",
@@ -37,7 +36,6 @@ def normalize_quality_grade(raw: Optional[str]) -> Optional[QualityGrade]:
     value = str(raw).strip()
     normalized = value.lower().replace(" ", "_")
 
-    # Map common localized labels to enum values
     aliases: dict[str, QualityGrade] = {
         "удовлетворительно": QualityGrade.SATISFACTORY,
         "требует_мер": QualityGrade.REQUIRES_ACTION,
@@ -50,7 +48,6 @@ def normalize_quality_grade(raw: Optional[str]) -> Optional[QualityGrade]:
     if normalized in aliases:
         return aliases[normalized]
 
-    # Fallback to direct enum name/value match
     for member in QualityGrade:
         if normalized == member.name.lower() or normalized == member.value.lower():
             return member
@@ -70,7 +67,6 @@ def normalize_ml_label(raw: Optional[str]) -> Optional[MLLabel]:
         if member.value.lower() == value:
             return member
 
-    # Unknown labels are treated as absent to keep the field optional.
     return None
 
 
@@ -91,7 +87,6 @@ def detect_file_type(columns: List[str]) -> str:
     cols_lower = {c.lower() for c in columns}
     if {"object_id", "lat", "lon"}.issubset(cols_lower):
         return "objects"
-    # Diagnostics files may come with either diag_id or object_id as the primary key.
     if {"diag_id", "method"}.issubset(cols_lower) or {"object_id", "method", "date"}.issubset(cols_lower):
         return "diagnostics"
     raise ValueError("Unknown file format")

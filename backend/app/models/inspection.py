@@ -1,9 +1,7 @@
 from datetime import datetime
 from typing import List, Optional, TYPE_CHECKING
-
 from sqlalchemy import Enum as SQLEnum
 from sqlmodel import Column, Field, Relationship, SQLModel
-
 from app.models.diagnostic import DiagnosticMethod, MLLabel, QualityGrade
 
 if TYPE_CHECKING:
