@@ -43,12 +43,17 @@ async def import_file(file: UploadFile, db: Session = Depends(get_db)):
 
     head_df = df.head(5)
     preview_df = head_df.where(pd.notnull(head_df), None)
+    # Ensure preview payload is JSON-safe (no NaN/NaT values)
+    preview_records = []
+    for record in preview_df.to_dict(orient="records"):
+        cleaned = {k: (None if pd.isna(v) else v) for k, v in record.items()}
+        preview_records.append(cleaned)
 
     return {
         "filename": file.filename,
         "file_type": file_type,
         "columns": columns,
-        "preview": preview_df.to_dict(orient="records"),
+        "preview": preview_records,
         "created": created,
         "updated": updated,
         "defects_created": defects_created,

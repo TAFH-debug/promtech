@@ -21,13 +21,14 @@ class DiagnosticMethod(str, enum.Enum):
     TFI = "TFI"
     GEO = "GEO"
     UTWM = "UTWM"
+    UT = "UT"
 
 
 class QualityGrade(str, enum.Enum):
     """Оценка качества"""
     SATISFACTORY = "удовлетворительно"
     ACCEPTABLE = "допустимо"
-    REQUIRES_ACTION = "требует мер"
+    REQUIRES_ACTION = "требует_мер"
     UNACCEPTABLE = "недопустимо"
 
 

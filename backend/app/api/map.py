@@ -33,15 +33,15 @@ class MapObjectResponse(BaseModel):
     lat: float
     lon: float
     pipeline_id: Optional[str]
-    status: str  # "unknown", "clean", "defect"
-    criticality: str  # "normal", "medium", "high" based on ml_label or quality_grade
+    status: str  
+    criticality: str  
     popup_data: MapPopupData
 
 
 def get_criticality_color(ml_label: Optional[MLLabel], quality_grade: Optional[QualityGrade], has_defect: bool) -> str:
     """Определяет цвет критичности на основе ml_label или quality_grade"""
     if ml_label:
-        return ml_label.value  # "normal", "medium", "high"
+        return ml_label.value  
     
     if quality_grade:
         if quality_grade == QualityGrade.UNACCEPTABLE:
