@@ -4,7 +4,7 @@ from typing import Optional
 
 class Settings(BaseSettings):
     DATABASE_URL: str = ""
-    API_V1_PREFIX: str = "/api"
+    API_V1_PREFIX: str = "/api/v1"
     
     class Config:
         env_file = ".env"

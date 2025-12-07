@@ -90,7 +90,7 @@ class DiagnosticCreate(DiagnosticBase):
 class DiagnosticUpdate(SQLModel):
     object_id: Optional[int] = None
     method: Optional[DiagnosticMethod] = None
-    date: Optional[date] = None
+    date: Optional[datetime] = None
     temperature: Optional[float] = None
     humidity: Optional[float] = None
     illumination: Optional[float] = None
