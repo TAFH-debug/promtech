@@ -1,8 +1,9 @@
 import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from app.api.deps import get_db
+from app.models.file_import import FileImport
 from app.services.import_helpers import detect_file_type, read_file_to_df
 from app.services.objects_importer import import_objects
 from app.services.diagnostics_importer import import_diagnostics
@@ -14,8 +15,9 @@ router = APIRouter()
 async def import_file(file: UploadFile, db: Session = Depends(get_db)):
     """Parse uploaded CSV/XLSX, detect file type, preview, and ingest data."""
     content = await file.read()
+    file_size = len(content)
     max_size = 5 * 1024 * 1024  # 5MB
-    if len(content) > max_size:
+    if file_size > max_size:
         raise HTTPException(status_code=400, detail="File too large (>5MB)")
 
     df = read_file_to_df(file, content)
@@ -41,6 +43,20 @@ async def import_file(file: UploadFile, db: Session = Depends(get_db)):
             raise HTTPException(status_code=400, detail=f"Missing required diagnostic columns: {', '.join(missing)}")
         created, defects_created = import_diagnostics(df, db, errors)
 
+    # Save import history
+    file_import = FileImport(
+        filename=file.filename or "unknown",
+        file_type=file_type,
+        file_size=file_size,
+        created=created,
+        updated=updated,
+        defects_created=defects_created,
+        error_count=len(errors),
+    )
+    db.add(file_import)
+    db.commit()
+    db.refresh(file_import)
+
     head_df = df.head(5)
     preview_df = head_df.where(pd.notnull(head_df), None)
 
@@ -53,4 +69,35 @@ async def import_file(file: UploadFile, db: Session = Depends(get_db)):
         "updated": updated,
         "defects_created": defects_created,
         "errors": errors,
+        "import_id": file_import.import_id,
     }
+
+
+@router.get("/imports/", response_model=list[dict])
+def get_import_history(
+    limit: int = 50,
+    offset: int = 0,
+    db: Session = Depends(get_db),
+):
+    """Get history of file imports."""
+    imports = db.exec(
+        select(FileImport)
+        .order_by(FileImport.imported_at.desc())
+        .limit(limit)
+        .offset(offset)
+    ).all()
+
+    return [
+        {
+            "import_id": imp.import_id,
+            "filename": imp.filename,
+            "file_type": imp.file_type,
+            "file_size": imp.file_size,
+            "created": imp.created,
+            "updated": imp.updated,
+            "defects_created": imp.defects_created,
+            "error_count": imp.error_count,
+            "imported_at": imp.imported_at.isoformat(),
+        }
+        for imp in imports
+    ]
