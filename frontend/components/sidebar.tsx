@@ -36,7 +36,7 @@ const menuItems: SidebarItem[] = [
   {
     title: "AI Bot",
     icon: Bot,
-    href: "/dashboard/ai-bot",
+    href: "/dashboard/bot",
   }
 ];
 

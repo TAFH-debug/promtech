@@ -334,7 +334,7 @@ export function MapDraw({ height = "600px", objects = [], filters }: MapDrawProp
       <MapContainer
         center={[51.1801, 71.446]} // Центр Казахстана
         zoom={6}
-        minZoom={3}
+        minZoom={12}
         maxZoom={18}
         style={{ height: "100%", width: "100%" }}
         className="z-0"

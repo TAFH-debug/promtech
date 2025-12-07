@@ -5,6 +5,7 @@ from . import map
 from . import reports
 from . import dashboard
 from . import ml
+from . import bot
 
 api_router = APIRouter()
 api_router.include_router(csv.router, prefix="/csv", tags=["csv"])
@@ -13,3 +14,4 @@ api_router.include_router(map.router, tags=["map"])
 api_router.include_router(reports.router, prefix="/reports", tags=["reports"])
 api_router.include_router(dashboard.router, prefix="/dashboard", tags=["dashboard"])
 api_router.include_router(ml.router, prefix="/ml", tags=["ml"])
+api_router.include_router(bot.router, prefix="/bot", tags=["bot"])
